@@ -1,0 +1,448 @@
+import {
+  DisplayLoop,
+  RetroAppWrapper,
+  SCREEN_CONTROLS,
+  LOG
+} from '@webrcade/app-common';
+
+import { Prefs } from './prefs';
+
+export class Emulator extends RetroAppWrapper {
+
+  VIDEO_WIDTH = 256;
+  VIDEO_HEIGHT = 192;
+
+  SCREEN_LAYOUT_TOP_BOTTOM = 0;
+  SCREEN_LAYOUT_BOTTOM_TOP = 1
+  SCREEN_LAYOUT_LEFT_RIGHT = 2;
+  SCREEN_LAYOUT_RIGHT_LEFT = 3;
+  SCREEN_LAYOUT_TOP_ONLY = 4;
+  SCREEN_LAYOUT_BOTTOM_ONLY = 5;
+  SCREEN_LAYOUT_HYBRID_TOP = 6;
+  SCREEN_LAYOUT_HYBRID_BOTTOM = 7;
+
+  // GAME_SRAM_NAME = 'game.srm';
+  // SAVE_NAME = 'sav';
+
+  constructor(app, debug = false) {
+    super(app, debug);
+
+    window.emulator = this;
+
+    this.mouseX = 0;
+    this.mouseY = 0;
+    this.mouseAbsX = 0;
+    this.mouseAbsY = 0;
+    this.mouseButtons = 0;
+
+    this.biosChecked = false;
+    this.aspectRatio = 4/3;
+    this.prefs = new Prefs(this);
+
+    this.firstFrame = true;
+    this.touchStartTime = 0;
+
+    document.onmousemove = (e) => {
+      this.mouseX = e.movementX;
+      this.mouseY = e.movementY;
+    }
+
+    document.onmousedown = (e) => {
+      switch (e.button) {
+        case 0:
+          this.mouseButtons |= this.MOUSE_LEFT;
+          break;
+        case 1:
+          this.mouseButtons |= this.MOUSE_MIDDLE;
+          break;
+        case 2:
+          this.mouseButtons |= this.MOUSE_RIGHT;
+          break;
+        default:
+      }
+    };
+
+    document.onmouseup = (e) => {
+      switch (e.button) {
+        case 0:
+          this.mouseButtons &= ~this.MOUSE_LEFT;
+          break;
+        case 1:
+          this.mouseButtons &= ~this.MOUSE_MIDDLE;
+          break;
+        case 2:
+          this.mouseButtons &= ~this.MOUSE_RIGHT;
+          break;
+        default:
+      }
+    }
+  }
+
+  getTouchRect() {
+    const result = [0, 0];
+    if (this.canvas) {
+      const rect = this.canvas.getBoundingClientRect();
+      const layout = this.getScreenLayout();
+      if (layout === this.SCREEN_LAYOUT_TOP_BOTTOM || layout === this.SCREEN_LAYOUT_BOTTOM_TOP) {
+        result[0] = rect.width;
+        result[1] = rect.height >>> 1;
+      } else if (layout === this.SCREEN_LAYOUT_LEFT_RIGHT || layout === this.SCREEN_LAYOUT_RIGHT_LEFT) {
+        result[0] = rect.width >>> 1;
+        result[1] = rect.height;
+      } else {
+        result[0] = rect.width;
+        result[1] = rect.height;
+      }
+    }
+
+    return result;
+  }
+
+  async createDisplayLoop(debug) {
+    const isSynced = await this.checkScreenSyncSync(60);
+    return new DisplayLoop(60, true, debug, isSynced, false);
+  }
+
+  getScriptUrl() {
+    return 'js/melonds_libretro.js';
+  }
+
+  getPrefs() {
+    return this.prefs;
+  }
+
+  async saveState() {
+    // const { saveStatePath, started } = this;
+    // const { FS, Module } = window;
+
+    try {
+      // if (!started) {
+      //   return;
+      // }
+
+      // // Save to files
+      // Module._cmd_savefiles();
+
+      // let path = '';
+      // const files = [];
+      // let s = null;
+
+      // path = `/home/web_user/retroarch/userdata/saves/${this.GAME_SRAM_NAME}`;
+      // LOG.info('Checking: ' + path);
+      // try {
+      //   s = FS.readFile(path);
+      //   if (s) {
+      //     LOG.info('Found save file: ' + path);
+      //     files.push({
+      //       name: this.SAVE_NAME,
+      //       content: s,
+      //     });
+      //   }
+      // } catch (e) {}
+
+      // if (files.length > 0) {
+      //   if (await this.getSaveManager().checkFilesChanged(files)) {
+      //     await this.getSaveManager().save(
+      //       saveStatePath,
+      //       files,
+      //       this.saveMessageCallback,
+      //     );
+      //   }
+      // } else {
+      //   await this.getSaveManager().delete(path);
+      // }
+    } catch (e) {
+      LOG.error('Error persisting save state: ' + e);
+    }
+  }
+
+  async loadState() {
+    // Check cloud storage (eliminate delay when showing settings)
+    try {
+      await this.getSaveManager().isCloudEnabled(this.loadMessageCallback);
+    } finally {
+      this.loadMessageCallback(null);
+    }
+
+    // const { saveStatePath } = this;
+    // const { FS } = window;
+
+    // Write the save state (if applicable)
+    try {
+      // // Load
+      // const files = await this.getSaveManager().load(
+      //   saveStatePath,
+      //   this.loadMessageCallback,
+      // );
+
+      // if (files) {
+      //   for (let i = 0; i < files.length; i++) {
+      //     const f = files[i];
+      //     if (f.name === this.SAVE_NAME) {
+      //       LOG.info(`writing ${this.GAME_SRAM_NAME} file`);
+      //       FS.writeFile(
+      //         `/home/web_user/retroarch/userdata/saves/${this.GAME_SRAM_NAME}`,
+      //         f.content,
+      //       );
+      //     }
+      //   }
+
+      //   // Cache the initial files
+      //   await this.getSaveManager().checkFilesChanged(files);
+      // }
+    } catch (e) {
+      LOG.error('Error loading save state: ' + e);
+    }
+  }
+
+  isEscapeHackEnabled() {
+    return false;
+  }
+
+  applyGameSettings() {
+    // const { Module } = window;
+    // const props = this.getProps();
+    // let options = 0;
+    // Module._wrc_set_options(options);
+    this.updateScreenLayout();
+
+    // setInterval(() => {
+    //   this.screenLayout++;
+    //   if (this.screenLayout > this.SCREEN_LAYOUT_BOTTOM_ONLY) {
+    //     this.screenLayout = 0;
+    //   }
+
+    //   this.updateScreenLayout();
+    //   setTimeout(() => {
+    //     this.updateScreenSize();
+    //   }, 50);
+    // }, 5 * 1000)
+  }
+
+  isForceAspectRatio() {
+    return false;
+  }
+
+  updateScreenLayout() {
+     const { Module } = window;
+    // const props = this.getProps();
+    let options = 0;
+    options |= this.OPT1;
+    Module._wrc_set_options(options);
+    setTimeout(() => {
+      this.updateScreenSize();
+    }, 50);
+  }
+
+  getScreenLayout() {
+    return this.getPrefs().getScreenLayout();
+  }
+
+  setScreenWidthAndHeight(width, height) {
+    console.log("## width and height: " + width + ", " + height);
+    this.aspectRatio = width/height;
+  }
+
+  getDefaultAspectRatio() {
+    return this.aspectRatio;
+  }
+
+  resizeScreen(canvas) {
+    this.canvas = canvas;
+    this.updateScreenSize();
+  }
+
+  onPause(p) {
+    super.onPause(p);
+    if (!p) {
+      setTimeout(() => {
+        this.updateScreenLayout()
+      }, 50);
+    }
+  }
+
+  showTouchOverlay(show) {
+    const to = document.getElementById("touch-overlay");
+    if (to) {
+      to.style.display = show ? 'block' : 'none';
+    }
+  }
+
+  checkOnScreenControls() {
+    const controls = this.prefs.getScreenControls();
+    if (controls === SCREEN_CONTROLS.SC_AUTO) {
+      setTimeout(() => {
+        this.showTouchOverlay(true);
+        this.app.forceRefresh();
+      }, 0);
+    }
+  }
+
+  onKeyboardEvent(e) {
+    if (e.code && !this.keyboardEvent) {
+      this.keyboardEvent = true;
+      this.checkOnScreenControls();
+    }
+  }
+
+  onTouchEvent() {
+    if (!this.touchEvent) {
+// this.touch.setTouchEnabled(true);
+      this.touchEvent = true;
+      this.checkOnScreenControls();
+    }
+  }
+
+  onMouseEvent() {
+    if (!this.mouseEvent) {
+      this.mouseEvent = true;
+      this.checkOnScreenControls();
+    }
+
+    this.mouseEventCount++;
+  }
+
+  updateOnScreenControls(initial = false) {
+    const controls = this.prefs.getScreenControls();
+    if (controls === SCREEN_CONTROLS.SC_OFF) {
+      this.showTouchOverlay(false);
+    } else if (controls === SCREEN_CONTROLS.SC_ON) {
+      this.showTouchOverlay(true);
+    } else if (controls === SCREEN_CONTROLS.SC_AUTO) {
+      if (!initial) {
+        setTimeout(() => {
+          this.showTouchOverlay(this.touchEvent || this.mouseEvent);
+          this.app.forceRefresh();
+        }, 0);
+      }
+    }
+  }
+
+  getMouseAbsX() {
+    // if (this.disableInput) return 0;
+    return this.mouseAbsX;
+  }
+
+  getMouseAbsY() {
+    // if (this.disableInput) return 0;
+    return this.mouseAbsY;
+  }
+
+  onFrame() {
+    if (this.firstFrame) {
+      this.firstFrame = false;
+      // this.touch = new Touch(this, this.canvas);
+
+      const canvas = this.canvas;
+      canvas.addEventListener("touchstart", (e) => {
+        e.preventDefault();
+      });
+
+      canvas.addEventListener("mousemove", (event) => {
+        const touchRect = this.getTouchRect();
+        const adjustX = this.VIDEO_WIDTH / touchRect[0]
+        const adjustY = this.VIDEO_HEIGHT / touchRect[1]
+        const rect = canvas.getBoundingClientRect();
+        let x = (event.clientX - rect.left) * adjustX;
+        let y = (event.clientY - rect.top) * adjustY;
+
+        const layout = this.getScreenLayout();
+        if (layout === this.SCREEN_LAYOUT_TOP_BOTTOM) {
+          y -= this.VIDEO_HEIGHT;
+        } else if (layout === this.SCREEN_LAYOUT_LEFT_RIGHT) {
+          x -= this.VIDEO_WIDTH;
+        }
+        if (x < 0) x = 0;
+        if (y < 0) y = 0;
+        if (x >= this.VIDEO_WIDTH) x = this.VIDEO_WIDTH - 1;
+        if (y >= this.VIDEO_HEIGHT) y = this.VIDEO_HEIGHT - 1;
+        this.mouseAbsX = x | 0;
+        this.mouseAbsY = y | 0;
+      });
+
+      document.getElementById("background").addEventListener("touchstart", (e) => {
+        e.preventDefault();
+      });
+      // document.body.addEventListener("touchstart", (e) => {
+      //   e.preventDefault();
+      // });
+      // window.addEventListener("touchstart", (e) => {
+      //   e.preventDefault();
+      // });
+      window.addEventListener("contextmenu", e => e.preventDefault());
+      document.body.addEventListener("contextmenu", e => e.preventDefault());
+      setTimeout(() => {
+        const onTouch = () => { this.onTouchEvent() };
+        window.addEventListener("touchstart", () => {
+          this.touchStartTime = Date.now();
+          onTouch();
+        });
+        window.addEventListener("touchend", () => {
+          this.touchStartTime = Date.now();
+          onTouch();
+        });
+        window.addEventListener("touchcancel", onTouch);
+        window.addEventListener("touchmove", onTouch);
+
+        const onMouse = () => { this.onMouseEvent() };
+        window.addEventListener("mousedown", onMouse);
+        window.addEventListener("mouseup", onMouse);
+        window.addEventListener("mousemove", onMouse);
+
+        this.app.showCanvas();
+      }, 10);
+    } else {
+      //console.log(this.mouseX + ", " + this.mouseY);
+
+      const touchRect = this.getTouchRect();
+
+      window.Module._wrc_update_mouse(
+        this.mouseX * (this.VIDEO_WIDTH / touchRect[0]) | 0 /** adjust*/,
+        this.mouseY * (this.VIDEO_HEIGHT / touchRect[1]) | 0 /** adjust*/,
+        this.mouseButtons /* | gamepadMouseButtons | this.touchClick */
+      );
+      this.mouseX = 0; this.mouseY = 0;
+    }
+  }
+
+  getShotAspectRatio() { return this.getDefaultAspectRatio(); }
+
+  getRaConfigContents() {
+    return (
+      "video_threaded = \"false\"\n" +
+      "video_vsync = \"false\"\n" +
+      "video_driver = \"256\"\n" +
+      "audio_latency = \"192\"\n" +
+      "audio_buffer_size = \"8192\"\n" +
+      "audio_sync = \"false\"\n" +
+      "audio_driver = \"sdl2\"\n"
+    )
+  }
+
+  createTouchListener() {}
+
+  checkScreenSyncSync(targetFPS = 60) {
+    return new Promise((resolve) => {
+      let frameCount = 0;
+
+      const currentTimeMillis = Date.now();
+
+      // Function to update FPS and check synchronization
+      function calculateFPS(timestamp) {
+        frameCount++;
+
+        // Calculate FPS every 1 second
+        if (frameCount === targetFPS) {
+          const elapsed = ((Date.now() - currentTimeMillis) / 1000.0);
+          resolve(elapsed > 0.92 && elapsed < 1.08);
+        }
+
+        // Continue the animation frame loop
+        requestAnimationFrame(calculateFPS);
+      }
+
+      // Start the FPS checking
+      requestAnimationFrame(calculateFPS);
+    });
+  }
+}
