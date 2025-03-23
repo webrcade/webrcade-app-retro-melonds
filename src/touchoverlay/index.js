@@ -45,6 +45,18 @@ export class TouchOverlay extends Component {
       }
     }
 
+    const triggerClick = (e) => {
+      const touch = e.changedTouches[0];
+      const clickEvent = new MouseEvent('click', {
+        bubbles: true,
+        cancelable: true,
+        clientX: touch.clientX,
+        clientY: touch.clientY
+      });
+      e.target.dispatchEvent(clickEvent);
+      e.stopPropagation();
+    }
+
     return (
       <div className="touch-overlay" id="touch-overlay">
         <div className="touch-overlay-buttons">
@@ -58,7 +70,7 @@ export class TouchOverlay extends Component {
                 e.stopPropagation();
               }}
               onTouchStart={(e) => {
-                e.stopPropagation();
+                triggerClick(e);
               }}
               onClick={(e) => {
                 e.stopPropagation();
@@ -80,10 +92,15 @@ export class TouchOverlay extends Component {
             <ImageButton
               className="touch-overlay-button-small"
               imgSrc={SplitSceneImage}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+              }}
+              onTouchStart={(e) => {
+                triggerClick(e);
+              }}
               onClick={() => {
                 const prefs = emulator.getPrefs();
                 let layout = prefs.getScreenLayout();
-
 
                 // SCREEN_LAYOUT_TOP_BOTTOM = 0;
                 // SCREEN_LAYOUT_BOTTOM_TOP = 1
@@ -113,7 +130,7 @@ export class TouchOverlay extends Component {
                 e.stopPropagation();
               }}
               onTouchStart={(e) => {
-                e.stopPropagation();
+                triggerClick(e);
               }}
               onClick={showPause}
               imgSrc={PauseWhiteImage}

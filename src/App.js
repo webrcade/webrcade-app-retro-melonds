@@ -39,6 +39,18 @@ class App extends WebrcadeRetroApp {
     this.setState({showCanvas: true});
   }
 
+  renderErrorScreen() {
+    const touch = this?.emulator?.touch;
+    if (touch) touch.setTouchEnabled(false);
+    return super.renderErrorScreen();
+  }
+
+  renderYesNoScreen() {
+    const touch = this?.emulator?.touch;
+    if (touch) touch.setTouchEnabled(false);
+    return super.renderYesNoScreen();
+  }
+
   renderPauseScreen() {
     const { appProps, emulator } = this;
 

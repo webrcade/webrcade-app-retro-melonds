@@ -1,11 +1,13 @@
 import {
   DisplayLoop,
   RetroAppWrapper,
+  CIDS,
   SCREEN_CONTROLS,
-  LOG
+  LOG,
 } from '@webrcade/app-common';
 
 import { Prefs } from './prefs';
+import { Touch } from './touch';
 
 export class Emulator extends RetroAppWrapper {
 
@@ -21,8 +23,8 @@ export class Emulator extends RetroAppWrapper {
   SCREEN_LAYOUT_HYBRID_TOP = 6;
   SCREEN_LAYOUT_HYBRID_BOTTOM = 7;
 
-  // GAME_SRAM_NAME = 'game.srm';
-  // SAVE_NAME = 'sav';
+  GAME_SRAM_NAME = 'game.sav';
+  SAVE_NAME = 'sav';
 
   constructor(app, debug = false) {
     super(app, debug);
@@ -35,12 +37,17 @@ export class Emulator extends RetroAppWrapper {
     this.mouseAbsY = 0;
     this.mouseButtons = 0;
 
+    this.gamepadMouseAdjust = 0;
+    this.gamepadMouseX = 0;
+    this.gamepadMouseY = 0;
+
     this.biosChecked = false;
     this.aspectRatio = 4/3;
     this.prefs = new Prefs(this);
 
     this.firstFrame = true;
     this.touchStartTime = 0;
+    this.touch = null;
 
     document.onmousemove = (e) => {
       this.mouseX = e.movementX;
@@ -112,84 +119,77 @@ export class Emulator extends RetroAppWrapper {
   }
 
   async saveState() {
-    // const { saveStatePath, started } = this;
-    // const { FS, Module } = window;
+    const { saveStatePath, started } = this;
+    const { FS, Module } = window;
 
     try {
-      // if (!started) {
-      //   return;
-      // }
+      if (!started) {
+        return;
+      }
 
-      // // Save to files
-      // Module._cmd_savefiles();
+      // Save to files
+      Module._cmd_savefiles();
 
-      // let path = '';
-      // const files = [];
-      // let s = null;
+      let path = '';
+      const files = [];
+      let s = null;
 
-      // path = `/home/web_user/retroarch/userdata/saves/${this.GAME_SRAM_NAME}`;
-      // LOG.info('Checking: ' + path);
-      // try {
-      //   s = FS.readFile(path);
-      //   if (s) {
-      //     LOG.info('Found save file: ' + path);
-      //     files.push({
-      //       name: this.SAVE_NAME,
-      //       content: s,
-      //     });
-      //   }
-      // } catch (e) {}
+      path = `/home/web_user/retroarch/userdata/saves/${this.GAME_SRAM_NAME}`;
+      LOG.info('Checking: ' + path);
+      try {
+        s = FS.readFile(path);
+        if (s) {
+          LOG.info('Found save file: ' + path);
+          files.push({
+            name: this.SAVE_NAME,
+            content: s,
+          });
+        }
+      } catch (e) {}
 
-      // if (files.length > 0) {
-      //   if (await this.getSaveManager().checkFilesChanged(files)) {
-      //     await this.getSaveManager().save(
-      //       saveStatePath,
-      //       files,
-      //       this.saveMessageCallback,
-      //     );
-      //   }
-      // } else {
-      //   await this.getSaveManager().delete(path);
-      // }
+      if (files.length > 0) {
+        if (await this.getSaveManager().checkFilesChanged(files)) {
+          await this.getSaveManager().save(
+            saveStatePath,
+            files,
+            this.saveMessageCallback,
+          );
+        }
+      } else {
+        await this.getSaveManager().delete(path);
+      }
     } catch (e) {
       LOG.error('Error persisting save state: ' + e);
     }
   }
 
   async loadState() {
-    // Check cloud storage (eliminate delay when showing settings)
-    try {
-      await this.getSaveManager().isCloudEnabled(this.loadMessageCallback);
-    } finally {
-      this.loadMessageCallback(null);
-    }
-
-    // const { saveStatePath } = this;
-    // const { FS } = window;
+    const { saveStatePath } = this;
+    const { FS } = window;
 
     // Write the save state (if applicable)
     try {
-      // // Load
-      // const files = await this.getSaveManager().load(
-      //   saveStatePath,
-      //   this.loadMessageCallback,
-      // );
+      // Load
+      const files = await this.getSaveManager().load(
+        saveStatePath,
+        this.loadMessageCallback,
+      );
 
-      // if (files) {
-      //   for (let i = 0; i < files.length; i++) {
-      //     const f = files[i];
-      //     if (f.name === this.SAVE_NAME) {
-      //       LOG.info(`writing ${this.GAME_SRAM_NAME} file`);
-      //       FS.writeFile(
-      //         `/home/web_user/retroarch/userdata/saves/${this.GAME_SRAM_NAME}`,
-      //         f.content,
-      //       );
-      //     }
-      //   }
+      if (files) {
+        for (let i = 0; i < files.length; i++) {
+          const f = files[i];
+          if (f.name === this.SAVE_NAME) {
+            LOG.info(`writing ${this.GAME_SRAM_NAME} file`);
+            FS.writeFile(
+              `/home/web_user/retroarch/userdata/saves/${this.GAME_SRAM_NAME}`,
+              f.content,
+            );
+          }
+        }
 
-      //   // Cache the initial files
-      //   await this.getSaveManager().checkFilesChanged(files);
-      // }
+        // Cache the initial files
+        await this.getSaveManager().checkFilesChanged(files);
+      }
     } catch (e) {
       LOG.error('Error loading save state: ' + e);
     }
@@ -231,6 +231,7 @@ export class Emulator extends RetroAppWrapper {
     Module._wrc_set_options(options);
     setTimeout(() => {
       this.updateScreenSize();
+      window.dispatchEvent(new Event("resize"));
     }, 50);
   }
 
@@ -254,6 +255,11 @@ export class Emulator extends RetroAppWrapper {
 
   onPause(p) {
     super.onPause(p);
+
+    if (this.touch) {
+      this.touch.setTouchEnabled(!p);
+    }
+
     if (!p) {
       setTimeout(() => {
         this.updateScreenLayout()
@@ -287,7 +293,7 @@ export class Emulator extends RetroAppWrapper {
 
   onTouchEvent() {
     if (!this.touchEvent) {
-// this.touch.setTouchEnabled(true);
+      //this.touch.setTouchEnabled(true);
       this.touchEvent = true;
       this.checkOnScreenControls();
     }
@@ -328,15 +334,84 @@ export class Emulator extends RetroAppWrapper {
     return this.mouseAbsY;
   }
 
+  updateMouseFromGamepad() {
+    const { canvas, controllers } = this;
+
+    if (!canvas || !controllers) return 0;
+
+    // Sensitivity factor for analog stick movement
+    let sensitivity = 3; // Adjust this value to change sensitivity
+
+    // Dead zone threshold
+    let deadZone = 0.15; // This value can be adjusted (0.1 means 10% of the stick's range)
+
+    const gamepads = navigator.getGamepads();
+    if (gamepads.length <= 0) return 0;
+
+    const gamepad = gamepads[0];
+    if (!gamepad || gamepad.axes.length < 4) return 0;
+
+    // Get the analog stick values (ranging from -1 to 1)
+    let stickX = gamepad.axes[2]; // X-axis (left-right)
+    let stickY = gamepad.axes[3]; // Y-axis (up-down)
+
+    // Check if the movement is within the dead zone
+    if (Math.abs(stickX) < deadZone) stickX = 0;
+    if (Math.abs(stickY) < deadZone) stickY = 0;
+
+    if (stickX !== 0 || stickY !== 0) {
+      if (stickX !== 0) {
+        stickX = stickX > 0 ? stickX - deadZone : stickX + deadZone;
+      }
+      if (stickY !== 0) {
+        stickY = stickY > 0 ? stickY - deadZone : stickY + deadZone;
+      }
+
+      // Apply sensitivity by multiplying the stick values
+      stickX *= sensitivity;
+      stickY *= sensitivity;
+
+      // const slow = false; // controllers.isControlDown(0, CIDS.RBUMP);
+      this.gamepadMouseX = stickX;
+      this.gamepadMouseY = stickY;
+    }
+
+    if (controllers.isControlDown(0, CIDS.LTRIG)) {
+      this.mouseAbsX = this.VIDEO_WIDTH / 2;
+      this.mouseAbsY = this.VIDEO_HEIGHT / 2;
+      this.gamepadMouseX = 0;
+      this.gamepadMouseY = 0;
+    }
+
+    return (
+      controllers.isControlDown(0, CIDS.RANALOG) ||
+      controllers.isControlDown(0, CIDS.RTRIG) ||
+      controllers.isControlDown(0, CIDS.LTRIG)) ? this.MOUSE_LEFT : 0;
+  }
+
+  handleEscape(controllers) {
+    if ((controllers.isControlDown(0, CIDS.LTRIG) && !controllers.isControlDown(0, CIDS.LANALOG))
+  ) {
+      return true;
+    }
+    return false;
+  }
+
+  // getExitOnLoopError() {
+  //   return true;
+  // }
+
   onFrame() {
+    if (this.touch) {
+      this.touch.setTouchEnabled(true);
+    }
+
     if (this.firstFrame) {
       this.firstFrame = false;
-      // this.touch = new Touch(this, this.canvas);
+
 
       const canvas = this.canvas;
-      canvas.addEventListener("touchstart", (e) => {
-        e.preventDefault();
-      });
+      this.touch = new Touch(this);
 
       canvas.addEventListener("mousemove", (event) => {
         const touchRect = this.getTouchRect();
@@ -363,12 +438,7 @@ export class Emulator extends RetroAppWrapper {
       document.getElementById("background").addEventListener("touchstart", (e) => {
         e.preventDefault();
       });
-      // document.body.addEventListener("touchstart", (e) => {
-      //   e.preventDefault();
-      // });
-      // window.addEventListener("touchstart", (e) => {
-      //   e.preventDefault();
-      // });
+
       window.addEventListener("contextmenu", e => e.preventDefault());
       document.body.addEventListener("contextmenu", e => e.preventDefault());
       setTimeout(() => {
@@ -392,14 +462,23 @@ export class Emulator extends RetroAppWrapper {
         this.app.showCanvas();
       }, 10);
     } else {
-      //console.log(this.mouseX + ", " + this.mouseY);
-
       const touchRect = this.getTouchRect();
+
+      const gamepadMouseButtons = this.updateMouseFromGamepad();
+      this.mouseAbsX += this.gamepadMouseX;
+      this.mouseAbsY += this.gamepadMouseY;
+      this.gamepadMouseX = 0;
+      this.gamepadMouseY = 0;
+
+      if (this.mouseAbsX < 0) this.mouseAbsX = 0;
+      if (this.mouseAbsY < 0) this.mouseAbsY = 0;
+      if (this.mouseAbsX >= this.VIDEO_WIDTH) this.mouseAbsX = this.VIDEO_WIDTH - 1;
+      if (this.mouseAbsY >= this.VIDEO_HEIGHT) this.mouseAbsY  = this.VIDEO_HEIGHT - 1;
 
       window.Module._wrc_update_mouse(
         this.mouseX * (this.VIDEO_WIDTH / touchRect[0]) | 0 /** adjust*/,
         this.mouseY * (this.VIDEO_HEIGHT / touchRect[1]) | 0 /** adjust*/,
-        this.mouseButtons /* | gamepadMouseButtons | this.touchClick */
+        this.mouseButtons | gamepadMouseButtons /*| this.touchClick */
       );
       this.mouseX = 0; this.mouseY = 0;
     }

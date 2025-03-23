@@ -23,6 +23,8 @@ export class Prefs extends AppPrefs {
 
     //this.gamepadModePath = app.getStoragePath(`${this.PREFS_PREFIX}.gamepadMode`);
     this.screenLayout = emu.SCREEN_LAYOUT_LEFT_RIGHT;
+    // Force bilinear to be the default
+    this.bilinearEnabled = true;
   }
 
   async load() {
