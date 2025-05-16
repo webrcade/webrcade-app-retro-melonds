@@ -10,6 +10,7 @@ import {
   FieldRow,
   FieldLabel,
   FieldControl,
+  Switch,
   WebrcadeContext,
 } from '@webrcade/app-common';
 
@@ -36,6 +37,8 @@ export class NintendoDsSettingsEditor extends Component {
         screenSize: emulator.getPrefs().getScreenSize(),
         origScreenLayout: emulator.getPrefs().getScreenLayout(),
         screenLayout: emulator.getPrefs().getScreenLayout(),
+        origScreenGap: emulator.getPrefs().getScreenGap(),
+        screenGap: emulator.getPrefs().getScreenGap(),
       },
     });
   }
@@ -57,6 +60,7 @@ export class NintendoDsSettingsEditor extends Component {
         showCancel={true}
         onOk={() => {
           let change = false;
+          let layoutChange = false;
           if (values.origBilinearMode !== values.bilinearMode) {
             emulator.getPrefs().setBilinearEnabled(values.bilinearMode);
             emulator.updateBilinearFilter();
@@ -69,8 +73,18 @@ export class NintendoDsSettingsEditor extends Component {
           }
           if (values.origScreenLayout !== values.screenLayout) {
             emulator.getPrefs().setScreenLayout(values.screenLayout);
-            emulator.updateScreenLayout();
+            layoutChange = true;
             change = true;
+          }
+          if (values.origScreenGap !== values.screenGap) {
+            emulator.getPrefs().setScreenGap(values.screenGap);
+            layoutChange = true;
+            change = true;
+          }
+          if (layoutChange) {
+            setTimeout(() => {
+              emulator.updateScreenLayout()
+            }, 50);
           }
           if (change) {
             emulator.getPrefs().save();
@@ -119,8 +133,10 @@ export class NintendoDsSettingTab extends FieldsTab {
   constructor() {
       super();
       this.screenLayoutRef = React.createRef();
+      this.screenGapRef = React.createRef();
       this.gridComps = [
           [this.screenLayoutRef],
+          [this.screenGapRef],
       ];
   }
 
@@ -135,7 +151,7 @@ export class NintendoDsSettingTab extends FieldsTab {
   }
 
   render() {
-      const { screenLayoutRef } = this;
+      const { screenLayoutRef, screenGapRef } = this;
       const { focusGrid } = this.context;
       const { setValues, values, emulator } = this.props;
 
@@ -156,6 +172,19 @@ export class NintendoDsSettingTab extends FieldsTab {
                       onPad={e => focusGrid.moveFocus(e.type, screenLayoutRef)}
                     />
                   </FieldControl>
+              </FieldRow>
+              <FieldRow>
+                <FieldLabel>Screen Gap</FieldLabel>
+                <FieldControl>
+                    <Switch
+                        ref={screenGapRef}
+                        onPad={(e) => focusGrid.moveFocus(e.type, screenGapRef)}
+                        onChange={(e) => {
+                            setValues({ ...values, ...{ screenGap: e.target.checked } });
+                        }}
+                        checked={values.screenGap}
+                    />
+                </FieldControl>
               </FieldRow>
           </Fragment>
       );

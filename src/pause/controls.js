@@ -2,6 +2,11 @@ import React from 'react';
 
 import { ControlsTab } from '@webrcade/app-common';
 
+
+// controllers.isControlDown(0, CIDS.RANALOG) ||
+// controllers.isControlDown(0, CIDS.RTRIG) ||
+// controllers.isControlDown(0, CIDS.LTRIG))
+
 export class GamepadControlsTab extends ControlsTab {
   render() {
     return (
@@ -16,6 +21,11 @@ export class GamepadControlsTab extends ControlsTab {
         {this.renderControl('x', 'Y')}
         {this.renderControl('lbump', 'Left Shoulder')}
         {this.renderControl('rbump', 'Right Shoulder')}
+        {this.renderControl('ranalog', 'Stylus (Move)')}
+        {this.renderControl('ranalogc', 'Stylus (Touch)')}
+        {this.renderControl('rtrig', 'Stylus (Touch)')}
+        {this.renderControl('lanalogc', 'Stylus (Center)')}
+        {this.renderControl('ltrig', 'Microphone (Blow)')}
       </>
     );
   }
@@ -37,6 +47,7 @@ export class KeyboardControlsTab extends ControlsTab {
         {this.renderKey('KeyA', 'Y')}
         {this.renderKey('KeyQ', 'Left Shoulder')}
         {this.renderKey('KeyW', 'Right Shoulder')}
+        {this.renderKey('KeyC', 'Microphone (Blow)')}
       </>
     );
   }

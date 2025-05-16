@@ -25,6 +25,7 @@ export class Prefs extends AppPrefs {
     this.screenLayout = emu.SCREEN_LAYOUT_LEFT_RIGHT;
     // Force bilinear to be the default
     this.bilinearEnabled = true;
+    this.screenGap = false;
   }
 
   async load() {
@@ -98,5 +99,13 @@ export class Prefs extends AppPrefs {
 
   getScreenLayout() {
     return this.screenLayout;
+  }
+
+  setScreenGap(value) {
+    this.screenGap = value;
+  }
+
+  getScreenGap() {
+    return this.screenGap;
   }
 }

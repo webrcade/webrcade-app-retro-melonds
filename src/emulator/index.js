@@ -1,6 +1,10 @@
 import {
   DisplayLoop,
   RetroAppWrapper,
+  KeyCodeToControlMapping,
+  Controllers,
+  Controller,
+  KCODES,
   CIDS,
   SCREEN_CONTROLS,
   LOG,
@@ -8,6 +12,27 @@ import {
 
 import { Prefs } from './prefs';
 import { Touch } from './touch';
+
+export class MelonDsKeyCodeToControlMapping extends KeyCodeToControlMapping {
+  constructor() {
+    super({
+      [KCODES.ARROW_UP]: CIDS.UP,
+      [KCODES.ARROW_DOWN]: CIDS.DOWN,
+      [KCODES.ARROW_RIGHT]: CIDS.RIGHT,
+      [KCODES.ARROW_LEFT]: CIDS.LEFT,
+      [KCODES.Z]: CIDS.A,
+      [KCODES.A]: CIDS.X,
+      [KCODES.X]: CIDS.B,
+      [KCODES.S]: CIDS.Y,
+      [KCODES.Q]: CIDS.LBUMP,
+      [KCODES.W]: CIDS.RBUMP,
+      [KCODES.SHIFT_RIGHT]: CIDS.SELECT,
+      [KCODES.ENTER]: CIDS.START,
+      [KCODES.ESCAPE]: CIDS.ESCAPE,
+      [KCODES.C]: CIDS.LTRIG,
+    });
+  }
+}
 
 export class Emulator extends RetroAppWrapper {
 
@@ -49,6 +74,10 @@ export class Emulator extends RetroAppWrapper {
     this.touchStartTime = 0;
     this.touch = null;
 
+    this.gap = 0;
+    this.bookMode = false;
+    this.gamepadForceCentered = false;
+
     document.onmousemove = (e) => {
       this.mouseX = e.movementX;
       this.mouseY = e.movementY;
@@ -83,6 +112,15 @@ export class Emulator extends RetroAppWrapper {
         default:
       }
     }
+  }
+
+  createControllers() {
+    return new Controllers([
+      new Controller(new MelonDsKeyCodeToControlMapping()),
+      new Controller(),
+      new Controller(),
+      new Controller(),
+    ]);
   }
 
   getTouchRect() {
@@ -200,23 +238,36 @@ export class Emulator extends RetroAppWrapper {
   }
 
   applyGameSettings() {
-    // const { Module } = window;
-    // const props = this.getProps();
-    // let options = 0;
-    // Module._wrc_set_options(options);
+    const props = this.getProps();
+    console.log(props)
+
+    const layout = props.screenLayout;
+    if (layout) {
+      let nextLayout = null;
+      if (layout === "left-right") {
+        nextLayout = this.SCREEN_LAYOUT_LEFT_RIGHT;
+      } else if (layout === "right-left") {
+        nextLayout = this.SCREEN_LAYOUT_RIGHT_LEFT;
+      } else if (layout === "top-bottom") {
+        nextLayout = this.SCREEN_LAYOUT_TOP_BOTTOM;
+      } else if (layout === "bottom-top") {
+        nextLayout = this.SCREEN_LAYOUT_BOTTOM_TOP;
+      } else if (layout === "top-only") {
+        nextLayout = this.SCREEN_LAYOUT_TOP_ONLY;
+      } else if (layout === "bottom-only") {
+        nextLayout = this.SCREEN_LAYOUT_BOTTOM_ONLY;
+      }
+      if (nextLayout !== null) {
+        this.getPrefs().setScreenLayout(nextLayout);
+      }
+    }
+
+    const gap = props.screenGap;
+    if (gap) {
+      this.getPrefs().setScreenGap(true);
+    }
+
     this.updateScreenLayout();
-
-    // setInterval(() => {
-    //   this.screenLayout++;
-    //   if (this.screenLayout > this.SCREEN_LAYOUT_BOTTOM_ONLY) {
-    //     this.screenLayout = 0;
-    //   }
-
-    //   this.updateScreenLayout();
-    //   setTimeout(() => {
-    //     this.updateScreenSize();
-    //   }, 50);
-    // }, 5 * 1000)
   }
 
   isForceAspectRatio() {
@@ -224,10 +275,15 @@ export class Emulator extends RetroAppWrapper {
   }
 
   updateScreenLayout() {
-     const { Module } = window;
-    // const props = this.getProps();
+    const { Module } = window;
+    //const props = this.getProps();
     let options = 0;
     options |= this.OPT1;
+
+    if (this.getPrefs().getScreenGap()) {
+      options |= this.OPT2;
+    }
+
     Module._wrc_set_options(options);
     setTimeout(() => {
       this.updateScreenSize();
@@ -236,12 +292,28 @@ export class Emulator extends RetroAppWrapper {
   }
 
   getScreenLayout() {
-    return this.getPrefs().getScreenLayout();
+    let layout = this.getPrefs().getScreenLayout();
+
+    if (this.bookMode) {
+      if (layout === this.SCREEN_LAYOUT_TOP_BOTTOM) {
+        layout = this.SCREEN_LAYOUT_LEFT_RIGHT;
+      } else if (layout === this.SCREEN_LAYOUT_BOTTOM_TOP) {
+        layout = this.SCREEN_LAYOUT_RIGHT_LEFT;
+      } else if (layout === this.SCREEN_LAYOUT_LEFT_RIGHT) {
+          layout = this.SCREEN_LAYOUT_TOP_BOTTOM;
+      } else if (layout === this.SCREEN_LAYOUT_RIGHT_LEFT) {
+        layout = this.SCREEN_LAYOUT_BOTTOM_TOP;
+      }
+    }
+
+    return layout;
   }
 
-  setScreenWidthAndHeight(width, height) {
+  setScreenWidthAndHeight(width, height, gap) {
     console.log("## width and height: " + width + ", " + height);
+    console.log("## gap: " + gap);
     this.aspectRatio = width/height;
+    this.gap = gap;
   }
 
   getDefaultAspectRatio() {
@@ -251,6 +323,23 @@ export class Emulator extends RetroAppWrapper {
   resizeScreen(canvas) {
     this.canvas = canvas;
     this.updateScreenSize();
+  }
+
+  updateScreenSize() {
+    const { canvas } = this;
+    super.updateScreenSize();
+
+    if (canvas) {
+      if (this.bookMode) {
+        canvas.classList.add('book-mode');
+      } else {
+        canvas.classList.remove('book-mode');
+      }
+    }
+  }
+
+  isScreenRotated() {
+    return this.bookMode;
   }
 
   onPause(p) {
@@ -376,17 +465,19 @@ export class Emulator extends RetroAppWrapper {
       this.gamepadMouseY = stickY;
     }
 
-    if (controllers.isControlDown(0, CIDS.LTRIG)) {
+    // Center Stylus (Cursor)
+    if (controllers.isControlDown(0, CIDS.LANALOG)) {
       this.mouseAbsX = this.VIDEO_WIDTH / 2;
       this.mouseAbsY = this.VIDEO_HEIGHT / 2;
       this.gamepadMouseX = 0;
       this.gamepadMouseY = 0;
+      this.gamepadForceCentered = true;
     }
 
     return (
       controllers.isControlDown(0, CIDS.RANALOG) ||
-      controllers.isControlDown(0, CIDS.RTRIG) ||
-      controllers.isControlDown(0, CIDS.LTRIG)) ? this.MOUSE_LEFT : 0;
+      controllers.isControlDown(0, CIDS.RTRIG)/* ||
+      controllers.isControlDown(0, CIDS.LTRIG)*/) ? this.MOUSE_LEFT : 0;
   }
 
   handleEscape(controllers) {
@@ -415,18 +506,27 @@ export class Emulator extends RetroAppWrapper {
 
       canvas.addEventListener("mousemove", (event) => {
         const touchRect = this.getTouchRect();
-        const adjustX = this.VIDEO_WIDTH / touchRect[0]
-        const adjustY = this.VIDEO_HEIGHT / touchRect[1]
+        const layout = this.getScreenLayout();
+
+        const adjustX = this.VIDEO_WIDTH / touchRect[0];
+        let adjustY = 0;
+        if (layout === this.SCREEN_LAYOUT_TOP_BOTTOM || layout === this.SCREEN_LAYOUT_BOTTOM_TOP ) {
+          adjustY = (this.VIDEO_HEIGHT + (this.gap / 2)) / touchRect[1];
+        } else {
+          adjustY = this.VIDEO_HEIGHT / touchRect[1];
+        }
+
         const rect = canvas.getBoundingClientRect();
         let x = (event.clientX - rect.left) * adjustX;
         let y = (event.clientY - rect.top) * adjustY;
 
-        const layout = this.getScreenLayout();
         if (layout === this.SCREEN_LAYOUT_TOP_BOTTOM) {
-          y -= this.VIDEO_HEIGHT;
+          y -= this.VIDEO_HEIGHT
+          y -= (this.gap);
         } else if (layout === this.SCREEN_LAYOUT_LEFT_RIGHT) {
           x -= this.VIDEO_WIDTH;
         }
+
         if (x < 0) x = 0;
         if (y < 0) y = 0;
         if (x >= this.VIDEO_WIDTH) x = this.VIDEO_WIDTH - 1;
@@ -464,7 +564,12 @@ export class Emulator extends RetroAppWrapper {
     } else {
       const touchRect = this.getTouchRect();
 
-      const gamepadMouseButtons = this.updateMouseFromGamepad();
+      let gamepadMouseButtons = this.updateMouseFromGamepad();
+      if (this.gamepadForceCentered) {
+        gamepadMouseButtons = 0;
+        this.gamepadForceCentered = false;
+      }
+
       this.mouseAbsX += this.gamepadMouseX;
       this.mouseAbsY += this.gamepadMouseY;
       this.gamepadMouseX = 0;
