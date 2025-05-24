@@ -26,6 +26,7 @@ export class GamepadControlsTab extends ControlsTab {
         {this.renderControl('rtrig', 'Stylus (Touch)')}
         {this.renderControl('lanalogc', 'Stylus (Center)')}
         {this.renderControl('ltrig', 'Microphone (Blow)')}
+        {this.renderControls('lanalogc', 'ranalogc', 'Toggle Screens')}
       </>
     );
   }

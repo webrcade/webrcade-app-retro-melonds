@@ -63,67 +63,72 @@ export class TouchOverlay extends Component {
           <div className="touch-overlay-buttons-left"></div>
           <div className="touch-overlay-buttons-center"></div>
           <div className="touch-overlay-buttons-right">
-            <ImageButton
-              className="touch-overlay-button-small"
-              imgSrc={SelectWindowImage}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-              }}
-              onTouchStart={(e) => {
-                triggerClick(e);
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
+            {!emulator.isBookMode() &&
+              <ImageButton
+                className="touch-overlay-button-small"
+                imgSrc={SelectWindowImage}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onTouchStart={(e) => {
+                  triggerClick(e);
+                }}
+                onClick={(e) => {
+                  e.stopPropagation();
 
-                const prefs = emulator.getPrefs();
-                let layout = prefs.getScreenLayout();
-                if (layout === emulator.SCREEN_LAYOUT_TOP_ONLY) {
-                  layout = emulator.SCREEN_LAYOUT_BOTTOM_ONLY;
-                } else {
-                  layout = emulator.SCREEN_LAYOUT_TOP_ONLY;
-                }
-                prefs.setScreenLayout(layout);
-                emulator.updateScreenLayout();
+                  const prefs = emulator.getPrefs();
+                  let layout = prefs.getScreenLayout();
+                  if (layout === emulator.SCREEN_LAYOUT_TOP_ONLY) {
+                    layout = emulator.SCREEN_LAYOUT_BOTTOM_ONLY;
+                  } else {
+                    layout = emulator.SCREEN_LAYOUT_TOP_ONLY;
+                  }
+                  emulator.resetToggleLayout();
+                  prefs.setScreenLayout(layout);
+                  emulator.updateScreenLayout();
 
-                return false;
-              }}
-              onFocus={(e) => {e.target.blur()}}
-            />
-            <ImageButton
-              className="touch-overlay-button-small"
-              imgSrc={SplitSceneImage}
-              onMouseDown={(e) => {
-                e.stopPropagation();
-              }}
-              onTouchStart={(e) => {
-                triggerClick(e);
-              }}
-              onClick={() => {
-                const prefs = emulator.getPrefs();
-                let layout = prefs.getScreenLayout();
+                  return false;
+                }}
+                onFocus={(e) => {e.target.blur()}}
+              />
+            }
+            {!emulator.isBookMode() &&
+              <ImageButton
+                className="touch-overlay-button-small"
+                imgSrc={SplitSceneImage}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+                }}
+                onTouchStart={(e) => {
+                  triggerClick(e);
+                }}
+                onClick={() => {
+                  const prefs = emulator.getPrefs();
+                  let layout = prefs.getScreenLayout();
 
-                // SCREEN_LAYOUT_TOP_BOTTOM = 0;
-                // SCREEN_LAYOUT_BOTTOM_TOP = 1
-                // SCREEN_LAYOUT_LEFT_RIGHT = 2;
-                // SCREEN_LAYOUT_RIGHT_LEFT = 3;
-                // SCREEN_LAYOUT_TOP_ONLY = 4;
-                // SCREEN_LAYOUT_BOTTOM_ONLY = 5;
-                // SCREEN_LAYOUT_HYBRID_TOP = 6;
-                // SCREEN_LAYOUT_HYBRID_BOTTOM = 7;
+                  // SCREEN_LAYOUT_TOP_BOTTOM = 0;
+                  // SCREEN_LAYOUT_BOTTOM_TOP = 1
+                  // SCREEN_LAYOUT_LEFT_RIGHT = 2;
+                  // SCREEN_LAYOUT_RIGHT_LEFT = 3;
+                  // SCREEN_LAYOUT_TOP_ONLY = 4;
+                  // SCREEN_LAYOUT_BOTTOM_ONLY = 5;
+                  // SCREEN_LAYOUT_HYBRID_TOP = 6;
+                  // SCREEN_LAYOUT_HYBRID_BOTTOM = 7;
 
-                if (layout > emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
-                  layout = emulator.SCREEN_LAYOUT_LEFT_RIGHT;
-                } else if (layout === emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
-                  layout = emulator.SCREEN_LAYOUT_TOP_BOTTOM;
-                } else {
-                  layout++;
-                }
-                prefs.setScreenLayout(layout);
-                emulator.updateScreenLayout();
+                  if (layout > emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
+                    layout = emulator.SCREEN_LAYOUT_LEFT_RIGHT;
+                  } else if (layout === emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
+                    layout = emulator.SCREEN_LAYOUT_TOP_BOTTOM;
+                  } else {
+                    layout++;
+                  }
+                  prefs.setScreenLayout(layout);
+                  emulator.updateScreenLayout();
 
-                return false;
-              }}
-            />
+                  return false;
+                }}
+              />
+            }
             <ImageButton
               className="touch-overlay-button touch-overlay-button-last"
               onMouseDown={(e) => {

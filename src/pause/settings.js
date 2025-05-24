@@ -39,6 +39,10 @@ export class NintendoDsSettingsEditor extends Component {
         screenLayout: emulator.getPrefs().getScreenLayout(),
         origScreenGap: emulator.getPrefs().getScreenGap(),
         screenGap: emulator.getPrefs().getScreenGap(),
+        origBookMode: emulator.isBookMode(),
+        bookMode: emulator.isBookMode(),
+        origDualAnalog: emulator.isDualAnalogMode(),
+        dualAnalog: emulator.isDualAnalogMode(),
       },
     });
   }
@@ -72,6 +76,7 @@ export class NintendoDsSettingsEditor extends Component {
             change = true;
           }
           if (values.origScreenLayout !== values.screenLayout) {
+            emulator.resetToggleLayout();
             emulator.getPrefs().setScreenLayout(values.screenLayout);
             layoutChange = true;
             change = true;
@@ -81,7 +86,19 @@ export class NintendoDsSettingsEditor extends Component {
             layoutChange = true;
             change = true;
           }
+          if (values.origBookMode !== values.bookMode) {
+            emulator.setBookMode(values.bookMode);
+            layoutChange = true;
+            change = true;
+          }
+          if (values.origDualAnalog !== values.dualAnalog) {
+            emulator.setDualAnalogMode(values.dualAnalog);
+            change = true;
+          }
           if (layoutChange) {
+            if (values.bookMode) {
+              emulator.getPrefs().setScreenLayout( emulator.SCREEN_LAYOUT_LEFT_RIGHT);
+            }
             setTimeout(() => {
               emulator.updateScreenLayout()
             }, 50);
@@ -97,7 +114,7 @@ export class NintendoDsSettingsEditor extends Component {
         tabs={[
           {
             image: GamepadWhiteImage,
-            label: 'DS Settings',
+            label: 'DS Settings (Session only)',
             content: (
               <NintendoDsSettingTab
                 emulator={emulator}
@@ -134,9 +151,13 @@ export class NintendoDsSettingTab extends FieldsTab {
       super();
       this.screenLayoutRef = React.createRef();
       this.screenGapRef = React.createRef();
+      this.bookModeRef = React.createRef();
+      this.dualAnalogRef = React.createRef();
       this.gridComps = [
           [this.screenLayoutRef],
           [this.screenGapRef],
+          [this.bookModeRef],
+          [this.dualAnalogRef],
       ];
   }
 
@@ -151,7 +172,7 @@ export class NintendoDsSettingTab extends FieldsTab {
   }
 
   render() {
-      const { screenLayoutRef, screenGapRef } = this;
+      const { screenLayoutRef, screenGapRef, bookModeRef, dualAnalogRef } = this;
       const { focusGrid } = this.context;
       const { setValues, values, emulator } = this.props;
 
@@ -183,6 +204,32 @@ export class NintendoDsSettingTab extends FieldsTab {
                             setValues({ ...values, ...{ screenGap: e.target.checked } });
                         }}
                         checked={values.screenGap}
+                    />
+                </FieldControl>
+              </FieldRow>
+              <FieldRow>
+                <FieldLabel>Book Mode</FieldLabel>
+                <FieldControl>
+                    <Switch
+                        ref={bookModeRef}
+                        onPad={(e) => focusGrid.moveFocus(e.type, bookModeRef)}
+                        onChange={(e) => {
+                            setValues({ ...values, ...{ bookMode: e.target.checked } });
+                        }}
+                        checked={values.bookMode}
+                    />
+                </FieldControl>
+              </FieldRow>
+              <FieldRow>
+                <FieldLabel>Dual Analog Mode (Stylus)</FieldLabel>
+                <FieldControl>
+                    <Switch
+                        ref={dualAnalogRef}
+                        onPad={(e) => focusGrid.moveFocus(e.type, dualAnalogRef)}
+                        onChange={(e) => {
+                            setValues({ ...values, ...{ dualAnalog: e.target.checked } });
+                        }}
+                        checked={values.dualAnalog}
                     />
                 </FieldControl>
               </FieldRow>

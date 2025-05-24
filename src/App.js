@@ -15,6 +15,22 @@ class App extends WebrcadeRetroApp {
     return new Emulator(app, isDebug);
   }
 
+  getHeapAllocSize(size) {
+    let CartROMSize = 0x200; // Start at 512
+    while (CartROMSize < size) {
+      CartROMSize <<= 1; // Multiply by 2
+    }
+    return CartROMSize;
+  }
+
+  isRomProgressBased() {
+    return true;
+  }
+
+  isHeapAllocEnabled() {
+    return true;
+  }
+
   isDiscBased() {
     return false;
   }
