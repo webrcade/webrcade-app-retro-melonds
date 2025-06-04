@@ -26,6 +26,7 @@ export class Prefs extends AppPrefs {
     // Force bilinear to be the default
     this.bilinearEnabled = true;
     this.screenGap = false;
+    this.microphoneSupported = false;
   }
 
   async load() {
@@ -107,5 +108,13 @@ export class Prefs extends AppPrefs {
 
   getScreenGap() {
     return this.screenGap;
+  }
+
+  setMicrophoneSupported(value) {
+    this.microphoneSupported = value;
+  }
+
+  isMicrophoneSupported() {
+    return this.microphoneSupported;
   }
 }

@@ -1,13 +1,11 @@
-import { Component } from "react";
+import  React, { Component } from "react";
 
 import {
   ImageButton,
-  // KeyboardWhiteImage,
   PauseWhiteImage,
   SelectWindowImage,
   SplitSceneImage,
-  // VideoGameAssetWhiteImage,
-  // VideoGameAssetOffWhiteImage,
+  MicrophoneImage,
 } from '@webrcade/app-common';
 
 import './style.scss'
@@ -18,13 +16,17 @@ export class TouchOverlay extends Component {
 
     this.state = {
       refresh: 0,
-      initialShow: true
+      initialShow: true,
+      microphoneOn: false,
     }
+
+    this.swap = React.createRef(false);
+    this.toggle = React.createRef(false);
   }
 
   render() {
     const { show } = this.props;
-    const { initialShow } = this.state;
+    const { initialShow, microphoneOn } = this.state;
     const { emulator } = window;
 
     if (!emulator || !show) return <></>;
@@ -53,41 +55,93 @@ export class TouchOverlay extends Component {
         clientX: touch.clientX,
         clientY: touch.clientY
       });
-      e.target.dispatchEvent(clickEvent);
+      e.preventDefault();
       e.stopPropagation();
+      e.target.dispatchEvent(clickEvent);
+    }
+
+    const setMicrophoneOn = (e, on, prevent) => {
+      if (prevent) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      this.setState({microphoneOn: on});
+      emulator.setMicrophoneOn(on);
+    }
+
+    const swapScreens = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const prefs = emulator.getPrefs();
+      let layout = prefs.getScreenLayout();
+      if (layout === emulator.SCREEN_LAYOUT_TOP_ONLY) {
+        layout = emulator.SCREEN_LAYOUT_BOTTOM_ONLY;
+      } else {
+        layout = emulator.SCREEN_LAYOUT_TOP_ONLY;
+      }
+      emulator.resetToggleLayout();
+      prefs.setScreenLayout(layout);
+      emulator.updateScreenLayout();
+    }
+
+    const toggleScreens = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const prefs = emulator.getPrefs();
+      let layout = prefs.getScreenLayout();
+
+      // SCREEN_LAYOUT_TOP_BOTTOM = 0;
+      // SCREEN_LAYOUT_BOTTOM_TOP = 1
+      // SCREEN_LAYOUT_LEFT_RIGHT = 2;
+      // SCREEN_LAYOUT_RIGHT_LEFT = 3;
+      // SCREEN_LAYOUT_TOP_ONLY = 4;
+      // SCREEN_LAYOUT_BOTTOM_ONLY = 5;
+      // SCREEN_LAYOUT_HYBRID_TOP = 6;
+      // SCREEN_LAYOUT_HYBRID_BOTTOM = 7;
+
+      if (layout > emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
+        layout = emulator.SCREEN_LAYOUT_LEFT_RIGHT;
+      } else if (layout === emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
+        layout = emulator.SCREEN_LAYOUT_TOP_BOTTOM;
+      } else {
+        layout++;
+      }
+      prefs.setScreenLayout(layout);
+      emulator.updateScreenLayout();
     }
 
     return (
       <div className="touch-overlay" id="touch-overlay">
         <div className="touch-overlay-buttons">
-          <div className="touch-overlay-buttons-left"></div>
+          <div className="touch-overlay-buttons-left touch-overlay-button-first">
+            {emulator.getPrefs().isMicrophoneSupported() &&
+              <ImageButton
+                className={`touch-overlay-button-small ${microphoneOn ? "touch-overlay-button-down" : ""}`}
+                imgSrc={MicrophoneImage}
+                onMouseDown={(e) => setMicrophoneOn(e, true, true)}
+                onMouseUp={(e) => setMicrophoneOn(e, false)}
+                onMouseLeave={(e) => setMicrophoneOn(e, false)}
+                onTouchStart={(e) => setMicrophoneOn(e, true, true)}
+                onTouchEnd={(e) => setMicrophoneOn(e, false, true)}
+                onFocus={(e) => {e.target.blur()}}
+              />
+            }
+          </div>
           <div className="touch-overlay-buttons-center"></div>
           <div className="touch-overlay-buttons-right">
             {!emulator.isBookMode() &&
               <ImageButton
                 className="touch-overlay-button-small"
                 imgSrc={SelectWindowImage}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                }}
                 onTouchStart={(e) => {
-                  triggerClick(e);
+                  this.swap.current = true;
+                  swapScreens(e);
                 }}
                 onClick={(e) => {
-                  e.stopPropagation();
-
-                  const prefs = emulator.getPrefs();
-                  let layout = prefs.getScreenLayout();
-                  if (layout === emulator.SCREEN_LAYOUT_TOP_ONLY) {
-                    layout = emulator.SCREEN_LAYOUT_BOTTOM_ONLY;
-                  } else {
-                    layout = emulator.SCREEN_LAYOUT_TOP_ONLY;
-                  }
-                  emulator.resetToggleLayout();
-                  prefs.setScreenLayout(layout);
-                  emulator.updateScreenLayout();
-
-                  return false;
+                  if (!this.swap.current) swapScreens(e);
+                  this.swap.current = false;
                 }}
                 onFocus={(e) => {e.target.blur()}}
               />
@@ -96,37 +150,15 @@ export class TouchOverlay extends Component {
               <ImageButton
                 className="touch-overlay-button-small"
                 imgSrc={SplitSceneImage}
-                onMouseDown={(e) => {
-                  e.stopPropagation();
-                }}
                 onTouchStart={(e) => {
-                  triggerClick(e);
+                  this.toggle.current = true;
+                  toggleScreens(e);
                 }}
-                onClick={() => {
-                  const prefs = emulator.getPrefs();
-                  let layout = prefs.getScreenLayout();
-
-                  // SCREEN_LAYOUT_TOP_BOTTOM = 0;
-                  // SCREEN_LAYOUT_BOTTOM_TOP = 1
-                  // SCREEN_LAYOUT_LEFT_RIGHT = 2;
-                  // SCREEN_LAYOUT_RIGHT_LEFT = 3;
-                  // SCREEN_LAYOUT_TOP_ONLY = 4;
-                  // SCREEN_LAYOUT_BOTTOM_ONLY = 5;
-                  // SCREEN_LAYOUT_HYBRID_TOP = 6;
-                  // SCREEN_LAYOUT_HYBRID_BOTTOM = 7;
-
-                  if (layout > emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
-                    layout = emulator.SCREEN_LAYOUT_LEFT_RIGHT;
-                  } else if (layout === emulator.SCREEN_LAYOUT_RIGHT_LEFT) {
-                    layout = emulator.SCREEN_LAYOUT_TOP_BOTTOM;
-                  } else {
-                    layout++;
-                  }
-                  prefs.setScreenLayout(layout);
-                  emulator.updateScreenLayout();
-
-                  return false;
+                onClick={(e) => {
+                  if (!this.toggle.current) toggleScreens(e);
+                  this.toggle.current = false;
                 }}
+                onFocus={(e) => {e.target.blur()}}
               />
             }
             <ImageButton

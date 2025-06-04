@@ -4,6 +4,7 @@ import {
   KeyCodeToControlMapping,
   Controllers,
   Controller,
+  md5Uint8Array,
   KCODES,
   CIDS,
   SCREEN_CONTROLS,
@@ -80,6 +81,8 @@ export class Emulator extends RetroAppWrapper {
     this.gamepadForceCentered = false;
     this.originalToggleLayout = null;
     this.isToggling = false;
+    this.microphoneOn = false;
+    this.biosInfo = {}
 
     document.onmousemove = (e) => {
       this.mouseX = e.movementX;
@@ -115,6 +118,10 @@ export class Emulator extends RetroAppWrapper {
         default:
       }
     }
+  }
+
+  setMicrophoneOn(on) {
+    this.microphoneOn = on;
   }
 
   isWriteEmptyRomEnabled() {
@@ -167,6 +174,23 @@ export class Emulator extends RetroAppWrapper {
 
   getPrefs() {
     return this.prefs;
+  }
+
+  updateSaveStateForSlotProps(slot, props) {
+    props.biosInfo = this.biosInfo || {};
+  }
+
+  async loadStateForSlot(slot, currentSlot) {
+    const saveBiosInfo = currentSlot.biosInfo;
+    let success = true;
+    if (saveBiosInfo) {
+      if (!this.isBiosFilesEqual(this.biosInfo, saveBiosInfo)) {
+        this.showMessage("The current BIOS files differ from those used when this save state was created.", 5000);
+        success = false;
+      }
+    }
+
+    return success  ? await super.loadStateForSlot(slot) : null;
   }
 
   async saveState() {
@@ -264,6 +288,11 @@ export class Emulator extends RetroAppWrapper {
     if (bookMode) {
       this.bookMode = bookMode;
       layout = this.SCREEN_LAYOUT_TOP_BOTTOM;
+    }
+
+    const microphone = props.microphone;
+    if (microphone) {
+      this.getPrefs().setMicrophoneSupported(true);
     }
 
     const dualAnalog = props.dualAnalog;
@@ -593,6 +622,14 @@ export class Emulator extends RetroAppWrapper {
       controllers.isControlDown(0, CIDS.LTRIG)*/) ? this.MOUSE_LEFT : 0;
   }
 
+  sendInput(controller, input, analog0x, analog0y, analog1x, analog1y) {
+    // Force microphone button down
+    if (this.microphoneOn) {
+      input |= this.INP_LTRIG;
+    }
+    super.sendInput(controller, input, analog0x, analog0y, analog1x, analog1y);
+  }
+
   handleEscape(controllers) {
     if ((controllers.isControlDown(0, CIDS.LTRIG) && !controllers.isControlDown(0, CIDS.LANALOG))
   ) {
@@ -601,9 +638,86 @@ export class Emulator extends RetroAppWrapper {
     return false;
   }
 
+  setNickname(firmware, nickname) {
+    for (let i = 0; i < 2; i++) {
+      const nicknameOffset = (i === 0 ? 0x3FE06 : 0x3FF06);
+      const lengthOffset = (i === 0 ? 0x3FE1A : 0x3FF1A);
+      const maxChars = 10;
+
+      if (!nickname || nickname.length === 0) {
+        // Clear nickname — fill 20 bytes with 0
+        for (let i = 0; i < maxChars * 2; i++) {
+          firmware[nicknameOffset + i] = 0x00;
+        }
+        firmware[lengthOffset] = 0;
+        return;
+      }
+
+      const trimmedName = nickname.slice(0, maxChars);
+      for (let i = 0; i < maxChars; i++) {
+        const charCode = i < trimmedName.length ? trimmedName.charCodeAt(i) : 0x0000;
+        firmware[nicknameOffset + i * 2] = charCode & 0xFF;
+        firmware[nicknameOffset + i * 2 + 1] = (charCode >> 8) & 0xFF;
+      }
+      firmware[lengthOffset] = trimmedName.length;
+    }
+  }
+
+  isBiosFilesEqual(bios1, bios2) {
+    const keys1 = Object.keys(bios1);
+    const keys2 = Object.keys(bios2);
+
+    // Check if both have the same keys
+    if (keys1.length !== keys2.length) return false;
+
+    for (const key of keys1) {
+      if (!bios2.hasOwnProperty(key)) return false;
+      if (bios1[key] !== bios2[key]) return false;
+    }
+
+    return true;
+  }
+
+  storeBiosInfo() {
+    const { biosBuffers } = this;
+
+    const biosInfo = {};
+
+    if (biosBuffers) {
+      for (const biosName in biosBuffers) {
+        biosInfo[biosName] = md5Uint8Array(biosBuffers[biosName]);
+      }
+    }
+
+    this.biosInfo = biosInfo;
+    console.log(this.biosInfo);
+  }
+
   // getExitOnLoopError() {
   //   return true;
   // }
+
+  async onStart(canvas) {
+    if (this.biosBuffers) {
+      const firmware = this.biosBuffers["firmware.bin"];
+      if (firmware) {
+        let setName = false;
+        const props = this.getProps();
+        if (props.ds_nickname) {
+          const nick = props.ds_nickname.trim();
+          if (nick.length > 0) {
+            setName = true;
+            this.setNickname(firmware, nick);
+          }
+        }
+        if (!setName) {
+          this.setNickname(firmware, 'webrcade');
+        }
+      }
+    }
+
+    return await super.onStart(canvas);
+  }
 
   onFrame() {
     const { controllers } = this;
@@ -615,8 +729,14 @@ export class Emulator extends RetroAppWrapper {
     if (this.firstFrame) {
       this.firstFrame = false;
 
+      this.storeBiosInfo();
+
       const canvas = this.canvas;
       this.touch = new Touch(this);
+
+      // window.document.body.addEventListener('touchmove', function (e) {
+      //   e.preventDefault();
+      // }, { passive: false });
 
       canvas.addEventListener("mousemove", (event) => {
         const touchRect = this.getTouchRect();

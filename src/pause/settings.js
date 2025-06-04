@@ -43,6 +43,10 @@ export class NintendoDsSettingsEditor extends Component {
         bookMode: emulator.isBookMode(),
         origDualAnalog: emulator.isDualAnalogMode(),
         dualAnalog: emulator.isDualAnalogMode(),
+        origMicrophone: emulator.getPrefs().isMicrophoneSupported(),
+        microphone: emulator.getPrefs().isMicrophoneSupported(),
+        origScreenControls: emulator.getPrefs().getScreenControls(),
+        screenControls: emulator.getPrefs().getScreenControls(),
       },
     });
   }
@@ -95,6 +99,12 @@ export class NintendoDsSettingsEditor extends Component {
             emulator.setDualAnalogMode(values.dualAnalog);
             change = true;
           }
+          if (values.origScreenControls !== values.screenControls) {
+            emulator.getPrefs().setScreenControls(values.screenControls);
+            emulator.updateOnScreenControls();
+            change = true;
+          }
+          emulator.getPrefs().setMicrophoneSupported(values.microphone);
           if (layoutChange) {
             if (values.bookMode) {
               emulator.getPrefs().setScreenLayout( emulator.SCREEN_LAYOUT_LEFT_RIGHT);
@@ -153,10 +163,12 @@ export class NintendoDsSettingTab extends FieldsTab {
       this.screenGapRef = React.createRef();
       this.bookModeRef = React.createRef();
       this.dualAnalogRef = React.createRef();
+      this.microphoneRef = React.createRef();
       this.gridComps = [
           [this.screenLayoutRef],
           [this.screenGapRef],
           [this.bookModeRef],
+          [this.microphoneRef],
           [this.dualAnalogRef],
       ];
   }
@@ -172,14 +184,14 @@ export class NintendoDsSettingTab extends FieldsTab {
   }
 
   render() {
-      const { screenLayoutRef, screenGapRef, bookModeRef, dualAnalogRef } = this;
+      const { screenLayoutRef, screenGapRef, bookModeRef, dualAnalogRef, microphoneRef } = this;
       const { focusGrid } = this.context;
       const { setValues, values, emulator } = this.props;
 
       return (
           <Fragment>
               <FieldRow>
-                  <FieldLabel>Screen Layout</FieldLabel>
+                  <FieldLabel>Screen layout</FieldLabel>
                   <FieldControl>
                     <ScreenLayoutSelect
                       emulator={emulator}
@@ -195,7 +207,7 @@ export class NintendoDsSettingTab extends FieldsTab {
                   </FieldControl>
               </FieldRow>
               <FieldRow>
-                <FieldLabel>Screen Gap</FieldLabel>
+                <FieldLabel>Screen gap</FieldLabel>
                 <FieldControl>
                     <Switch
                         ref={screenGapRef}
@@ -208,7 +220,7 @@ export class NintendoDsSettingTab extends FieldsTab {
                 </FieldControl>
               </FieldRow>
               <FieldRow>
-                <FieldLabel>Book Mode</FieldLabel>
+                <FieldLabel>Book mode</FieldLabel>
                 <FieldControl>
                     <Switch
                         ref={bookModeRef}
@@ -221,7 +233,20 @@ export class NintendoDsSettingTab extends FieldsTab {
                 </FieldControl>
               </FieldRow>
               <FieldRow>
-                <FieldLabel>Dual Analog Mode (Stylus)</FieldLabel>
+                <FieldLabel>Microphone supported</FieldLabel>
+                <FieldControl>
+                    <Switch
+                        ref={microphoneRef}
+                        onPad={(e) => focusGrid.moveFocus(e.type, microphoneRef)}
+                        onChange={(e) => {
+                            setValues({ ...values, ...{ microphone: e.target.checked } });
+                        }}
+                        checked={values.microphone}
+                    />
+                </FieldControl>
+              </FieldRow>
+              <FieldRow>
+                <FieldLabel>Dual analog mode (Stylus)</FieldLabel>
                 <FieldControl>
                     <Switch
                         ref={dualAnalogRef}

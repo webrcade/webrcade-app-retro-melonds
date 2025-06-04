@@ -44,6 +44,10 @@ class App extends WebrcadeRetroApp {
       'df692a80a5b1bc90728bc3dfc76cd948': 'bios7.bin',
       'a392174eb3e572fed6447e956bde4b25': 'bios9.bin',
       '3c704824663ce26b6a1ed4d85238ae5b': 'firmware.bin',
+      '94bc5094607c5e6598d50472c52f27f2': 'firmware.bin',
+      // '559dae4ea78eb9d67702c56c1d791e81' : 'dsi_bios7.bin',
+      // '87b665fce118f76251271c3732532777' : 'dsi_bios9.bin	',
+      // '74f23348012d7b3e1cc216c47192ffeb' : 'dsi_firmware.bin',
     };
   }
 

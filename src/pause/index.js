@@ -137,7 +137,7 @@ export class EmulatorPauseScreen extends Component {
         {mode === ModeEnum.SETTINGS ? (
           <NintendoDsSettingsEditor
             emulator={emulator}
-            showOnScreenControls={false /*true*/}
+            showOnScreenControls={true}
             onClose={closeCallback}
           />
         ) : null}
