@@ -4,11 +4,11 @@
 
 The Nintendo DS application for [webЯcade](https://www.webrcade.com)  is an emulator for the [Nintendo DS](https://en.wikipedia.org/wiki/Nintendo_DS) handheld game console.
 
-The underlying emulator is a modified version of the Libretro fork of [melonDS](https://github.com/libretro/stella).
+The underlying emulator is a modified version of the Libretro fork of [melonDS](https://github.com/libretro/melonds).
 
 <p align="center">
  <a href="https://play.webrcade.com">
-  <img src="https://docs.webrcade.com/assets/images/apps/nds.png?raw=full?raw=true" width="90%">
+  <img src="https://docs.webrcade.com/assets/images/apps/nds.png?raw=true" width="90%">
  </a>
  <br>
  <i>WolveSlayer by Firehazard Studio
