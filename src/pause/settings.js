@@ -11,6 +11,8 @@ import {
   FieldLabel,
   FieldControl,
   Switch,
+  BlurImage,
+  ShaderSettingsTab,
   WebrcadeContext,
 } from '@webrcade/app-common';
 
@@ -29,25 +31,30 @@ export class NintendoDsSettingsEditor extends Component {
   componentDidMount() {
     const { emulator } = this.props;
 
+    const values = {
+      origBilinearMode: emulator.getPrefs().isBilinearEnabled(),
+      bilinearMode: emulator.getPrefs().isBilinearEnabled(),
+      origScreenSize: emulator.getPrefs().getScreenSize(),
+      screenSize: emulator.getPrefs().getScreenSize(),
+      origScreenLayout: emulator.getPrefs().getScreenLayout(),
+      screenLayout: emulator.getPrefs().getScreenLayout(),
+      origScreenGap: emulator.getPrefs().getScreenGap(),
+      screenGap: emulator.getPrefs().getScreenGap(),
+      origBookMode: emulator.isBookMode(),
+      bookMode: emulator.isBookMode(),
+      origDualAnalog: emulator.isDualAnalogMode(),
+      dualAnalog: emulator.isDualAnalogMode(),
+      origMicrophone: emulator.getPrefs().isMicrophoneSupported(),
+      microphone: emulator.getPrefs().isMicrophoneSupported(),
+      origScreenControls: emulator.getPrefs().getScreenControls(),
+      screenControls: emulator.getPrefs().getScreenControls(),
+    }
+
+    this.shaderService = this.props.emulator.getShadersService();
+    this.shaderService.addEditorValues(values);
+
     this.setState({
-      values: {
-        origBilinearMode: emulator.getPrefs().isBilinearEnabled(),
-        bilinearMode: emulator.getPrefs().isBilinearEnabled(),
-        origScreenSize: emulator.getPrefs().getScreenSize(),
-        screenSize: emulator.getPrefs().getScreenSize(),
-        origScreenLayout: emulator.getPrefs().getScreenLayout(),
-        screenLayout: emulator.getPrefs().getScreenLayout(),
-        origScreenGap: emulator.getPrefs().getScreenGap(),
-        screenGap: emulator.getPrefs().getScreenGap(),
-        origBookMode: emulator.isBookMode(),
-        bookMode: emulator.isBookMode(),
-        origDualAnalog: emulator.isDualAnalogMode(),
-        dualAnalog: emulator.isDualAnalogMode(),
-        origMicrophone: emulator.getPrefs().isMicrophoneSupported(),
-        microphone: emulator.getPrefs().isMicrophoneSupported(),
-        origScreenControls: emulator.getPrefs().getScreenControls(),
-        screenControls: emulator.getPrefs().getScreenControls(),
-      },
+      values: values,
     });
   }
 
@@ -66,7 +73,7 @@ export class NintendoDsSettingsEditor extends Component {
     return (
       <EditorScreen
         showCancel={true}
-        onOk={() => {
+        onOk={async () => {
           let change = false;
           let layoutChange = false;
           if (values.origBilinearMode !== values.bilinearMode) {
@@ -116,6 +123,10 @@ export class NintendoDsSettingsEditor extends Component {
           if (change) {
             emulator.getPrefs().save();
           }
+
+          // Set the shader
+          await this.shaderService.setShader(values.shaderId);
+
           onClose();
         }}
         onClose={onClose}
@@ -148,6 +159,20 @@ export class NintendoDsSettingsEditor extends Component {
                 setValues={setValues}
               />
             ),
+          },
+          {
+            image: BlurImage,
+            label: 'Shader Settings',
+            content: (
+              <ShaderSettingsTab
+                shaderService={this.shaderService}
+                emulator={emulator}
+                isActive={tabIndex === 3}
+                setFocusGridComps={setFocusGridComps}
+                values={values}
+                setValues={setValues}
+              />
+            )
           },
         ]}
       />
