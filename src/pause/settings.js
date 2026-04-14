@@ -168,7 +168,7 @@ export class NintendoDsSettingsEditor extends Component {
               <ShaderSettingsTab
                 shaderService={this.shaderService}
                 emulator={emulator}
-                isActive={tabIndex === 3}
+                isActive={tabIndex === 2}
                 setFocusGridComps={setFocusGridComps}
                 values={values}
                 setValues={setValues}
