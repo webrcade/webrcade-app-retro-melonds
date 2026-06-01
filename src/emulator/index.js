@@ -476,6 +476,10 @@ export class Emulator extends RetroAppWrapper {
     return layout;
   }
 
+  getFirmwareLanguage() {
+    return this.getProps().firmwareLanguage || 0;
+  }
+
   setScreenWidthAndHeight(width, height, gap) {
     console.log("## width and height: " + width + ", " + height);
     console.log("## gap: " + gap);
