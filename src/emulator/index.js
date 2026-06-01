@@ -9,6 +9,7 @@ import {
   CIDS,
   SCREEN_CONTROLS,
   LOG,
+  achievements,
 } from '@webrcade/app-common';
 
 import { Prefs } from './prefs';
@@ -170,6 +171,83 @@ export class Emulator extends RetroAppWrapper {
 
   getScriptUrl() {
     return 'js/melonds_libretro.js';
+  }
+
+  getHashFileExtension() {
+    return 'nds';
+  }
+
+  // Compute the RetroAchievements NDS hash from a Uint8Array.
+  // Mirrors rc_hash_nintendo_ds_buffer() in rcheevos/src/rhash/hash.c:
+  //   MD5( header[0..0x160) + ARM9 code + ARM7 code + icon[0..0xA00) )
+  ndsRaHash(rom) {
+    const readU32LE = (buf, off) =>
+      (buf[off] | (buf[off+1] << 8) | (buf[off+2] << 16) | (buf[off+3] << 24)) >>> 0;
+
+    let offset = 0;
+    let header = rom;
+
+    if (rom.length < 512) {
+      LOG.error('[NDS RA Hash] ROM too small to hash');
+      return null;
+    }
+
+    // SuperCard header detection
+    if (rom[0] === 0x2E && rom[1] === 0x00 && rom[2] === 0x00 && rom[3] === 0xEA &&
+        rom[0xB0] === 0x44 && rom[0xB1] === 0x46 && rom[0xB2] === 0x96 && rom[0xB3] === 0) {
+      LOG.info('[NDS RA Hash] Ignoring SuperCard header');
+      offset = 512;
+      header = rom.subarray(512);
+      if (rom.length < 1024) {
+        LOG.error('[NDS RA Hash] ROM too small after SuperCard prefix');
+        return null;
+      }
+    }
+
+    const arm9Addr = readU32LE(header, 0x20);
+    const arm9Size = readU32LE(header, 0x2C);
+    const arm7Addr = readU32LE(header, 0x30);
+    const arm7Size = readU32LE(header, 0x3C);
+    const iconAddr = readU32LE(header, 0x68);
+
+    if (arm9Size + arm7Size > 16 * 1024 * 1024) {
+      LOG.error(`[NDS RA Hash] arm9 (${arm9Size}) + arm7 (${arm7Size}) > 16MB`);
+      return null;
+    }
+
+    // Build the buffer to hash: header[0..0x160) + ARM9 + ARM7 + icon(0xA00)
+    const iconEnd = iconAddr + offset + 0xA00;
+    const iconAvail = iconEnd <= rom.length ? 0xA00 : Math.max(0, rom.length - (iconAddr + offset));
+    const total = 0x160 + arm9Size + arm7Size + 0xA00;
+    const buf = new Uint8Array(total);
+    let pos = 0;
+
+    // Header (352 bytes)
+    buf.set(header.subarray(0, 0x160), pos); pos += 0x160;
+    // ARM9
+    buf.set(rom.subarray(arm9Addr + offset, arm9Addr + offset + arm9Size), pos); pos += arm9Size;
+    // ARM7
+    buf.set(rom.subarray(arm7Addr + offset, arm7Addr + offset + arm7Size), pos); pos += arm7Size;
+    // Icon (zero-padded if short)
+    if (iconAvail > 0) {
+      buf.set(rom.subarray(iconAddr + offset, iconAddr + offset + iconAvail), pos);
+    }
+    // remaining bytes are already 0 from new Uint8Array
+
+    return md5Uint8Array(buf);
+  }
+
+  getRaHash() {
+    return this.raHash || null;
+  }
+
+  setRoms(uid, frontendArray, biosBuffers, romBytes, ext) {
+    this.raHash = null;
+    if (romBytes && achievements.isLoggedIn()) {
+      this.raHash = this.ndsRaHash(romBytes);
+      LOG.info(`[NDS RA Hash] ${this.raHash}`);
+    }
+    super.setRoms(uid, frontendArray, biosBuffers, romBytes, ext);
   }
 
   getPrefs() {
@@ -396,6 +474,10 @@ export class Emulator extends RetroAppWrapper {
     }
 
     return layout;
+  }
+
+  getFirmwareLanguage() {
+    return this.getProps().firmwareLanguage || 0;
   }
 
   setScreenWidthAndHeight(width, height, gap) {
