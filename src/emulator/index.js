@@ -10,6 +10,8 @@ import {
   SCREEN_CONTROLS,
   LOG,
   achievements,
+  FetchAppData,
+  Unzip,
 } from '@webrcade/app-common';
 
 import { Prefs } from './prefs';
@@ -798,6 +800,9 @@ export class Emulator extends RetroAppWrapper {
       }
     }
 
+    // Pre-download SD card files before emulator starts
+    await this.downloadSDCardFilesBeforeStart();
+
     return await super.onStart(canvas);
   }
 
@@ -959,6 +964,73 @@ export class Emulator extends RetroAppWrapper {
       "audio_sync = \"false\"\n" +
       "audio_driver = \"sdl2\"\n"
     )
+  }
+
+  isDLDIEnabled() {
+    const props = this.getProps();
+    return props.homebrewSdCard ? 1 : 0;
+  }
+
+  getSDCardFilePath(index) {
+    const files = this._sdCardFilesData;
+    if (!files || index >= files.length) return 0;
+    const bytes = new TextEncoder().encode(files[index].path + '\0');
+    const ptr = window.Module._malloc(bytes.length);
+    window.Module.HEAPU8.set(bytes, ptr);
+    return ptr;
+  }
+
+  downloadSDCardFile(index) {
+    const files = this._sdCardFilesData;
+    if (!files || !files[index]) return 0;
+    const data = files[index].data;
+    const ptr = window.Module._malloc(data.byteLength);
+    window.Module.HEAPU8.set(new Uint8Array(data), ptr);
+    this._sdCardFilePtr = ptr;
+    this._sdCardFileLength = data.byteLength;
+    return ptr;
+  }
+
+  getSDCardFileLength() {
+    return this._sdCardFileLength || 0;
+  }
+
+  freeSDCardFileData() {
+    if (this._sdCardFilePtr) {
+      window.Module._free(this._sdCardFilePtr);
+      this._sdCardFilePtr = null;
+      this._sdCardFileLength = 0;
+    }
+  }
+
+  async downloadSDCardFilesBeforeStart() {
+    const props = this.getProps();
+    const { sdCardArchive, sdCardPath } = props;
+
+    if (!sdCardArchive) return;
+
+    const basePath = (sdCardPath && sdCardPath.length > 0) ? sdCardPath : '/';
+
+    try {
+      this.app.setState({ loadingMessage: 'Extracting files', loadingPercent: null });
+      LOG.info(`Downloading SD card archive: ${sdCardArchive}`);
+      const response = await new FetchAppData(sdCardArchive).fetch();
+      const blob = await response.blob();
+
+      const entries = await new Unzip().unzipFiles(blob);
+
+      this._sdCardFilesData = [];
+      for (const entry of entries) {
+        if (entry.name.endsWith('/')) continue;
+        const data = await entry.content.arrayBuffer();
+        const sep = basePath.endsWith('/') ? '' : '/';
+        const path = basePath + sep + entry.name;
+        LOG.info(`SD card file queued: ${path} (${data.byteLength} bytes)`);
+        this._sdCardFilesData.push({ path, data });
+      }
+    } finally {
+      this.app.setState({ loadingMessage: null });
+    }
   }
 
   createTouchListener() {}
