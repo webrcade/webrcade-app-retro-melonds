@@ -11,6 +11,7 @@ import {
   FieldLabel,
   FieldControl,
   Switch,
+  Select,
   BlurImage,
   ShaderSettingsTab,
   WebrcadeContext,
@@ -44,8 +45,8 @@ export class NintendoDsSettingsEditor extends Component {
       bookMode: emulator.isBookMode(),
       origDualAnalog: emulator.isDualAnalogMode(),
       dualAnalog: emulator.isDualAnalogMode(),
-      origMicrophone: emulator.getPrefs().isMicrophoneSupported(),
-      microphone: emulator.getPrefs().isMicrophoneSupported(),
+      origMicrophone: emulator.getPrefs().getBlowType(),
+      microphone: emulator.getPrefs().getBlowType(),
       origScreenControls: emulator.getPrefs().getScreenControls(),
       screenControls: emulator.getPrefs().getScreenControls(),
     }
@@ -110,7 +111,10 @@ export class NintendoDsSettingsEditor extends Component {
             emulator.updateOnScreenControls();
             change = true;
           }
-          emulator.getPrefs().setMicrophoneSupported(values.microphone);
+          if (values.origMicrophone !== values.microphone) {
+            emulator.getPrefs().setBlowType(values.microphone);
+            change = true;
+          }
           if (layoutChange) {
             if (values.bookMode) {
               emulator.getPrefs().setScreenLayout( emulator.SCREEN_LAYOUT_LEFT_RIGHT);
@@ -259,15 +263,21 @@ export class NintendoDsSettingTab extends FieldsTab {
                 </FieldControl>
               </FieldRow>
               <FieldRow>
-                <FieldLabel>Microphone supported</FieldLabel>
+                <FieldLabel>Microphone (Blow)</FieldLabel>
                 <FieldControl>
-                    <Switch
+                    <Select
                         ref={microphoneRef}
-                        onPad={(e) => focusGrid.moveFocus(e.type, microphoneRef)}
-                        onChange={(e) => {
-                            setValues({ ...values, ...{ microphone: e.target.checked } });
+                        width={"10rem"}
+                        options={[
+                          { value: 0, label: "Disabled" },
+                          { value: 1, label: "Random Noise" },
+                          { value: 2, label: "Realistic Sample" },
+                        ]}
+                        onChange={(value) => {
+                            setValues({ ...values, ...{ microphone: value } });
                         }}
-                        checked={values.microphone}
+                        value={values.microphone}
+                        onPad={e => focusGrid.moveFocus(e.type, microphoneRef)}
                     />
                 </FieldControl>
               </FieldRow>

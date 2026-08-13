@@ -26,7 +26,8 @@ export class Prefs extends NewRetroPrefs {
     // Force bilinear to be the default
     this.bilinearEnabled = true;
     this.screenGap = false;
-    this.microphoneSupported = false;
+    // 0 = mic/blow disabled, 1/2 = which blow simulation to use
+    this.blowType = 0;
   }
 
   async load() {
@@ -110,11 +111,15 @@ export class Prefs extends NewRetroPrefs {
     return this.screenGap;
   }
 
-  setMicrophoneSupported(value) {
-    this.microphoneSupported = value;
+  setBlowType(value) {
+    this.blowType = value;
+  }
+
+  getBlowType() {
+    return this.blowType;
   }
 
   isMicrophoneSupported() {
-    return this.microphoneSupported;
+    return this.blowType !== 0;
   }
 }

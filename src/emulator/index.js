@@ -370,10 +370,12 @@ export class Emulator extends RetroAppWrapper {
       layout = this.SCREEN_LAYOUT_TOP_BOTTOM;
     }
 
-    const microphone = props.microphone;
-    if (microphone) {
-      this.getPrefs().setMicrophoneSupported(true);
-    }
+    // Legacy saved feeds may still have a real boolean here (before this was
+    // a 0/1/2 blow-type selector) -- true !== 1, so normalize explicitly.
+    let microphone = props.microphone;
+    if (microphone === true) microphone = 1;
+    else if (microphone === false || microphone === undefined) microphone = 0;
+    this.getPrefs().setBlowType(microphone);
 
     const dualAnalog = props.dualAnalog;
     if (dualAnalog) {
@@ -458,6 +460,10 @@ export class Emulator extends RetroAppWrapper {
         window.dispatchEvent(new Event("resize"));
       }
     }, 50);
+  }
+
+  getBlowType() {
+    return this.getPrefs().getBlowType();
   }
 
   getScreenLayout() {
