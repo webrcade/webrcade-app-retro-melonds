@@ -350,6 +350,12 @@ export class Emulator extends RetroAppWrapper {
     }
   }
 
+  // WRC - melonDS libretro core maps L2 to `holding_noise_btn` (the mic/
+  // blow button, src/libretro/input.cpp), which technically fits the
+  // isEscapeHackEnabled() rule (a real, extended-hold function). Left
+  // false anyway: blow-using games are rare in practice, and enabling the
+  // hack means a real long Pause-combo hold could stop registering, which
+  // costs everyday Pause convenience for a corner case not worth it.
   isEscapeHackEnabled() {
     return false;
   }
