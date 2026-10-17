@@ -350,6 +350,12 @@ export class Emulator extends RetroAppWrapper {
     }
   }
 
+  // WRC - melonDS libretro core maps L2 to `holding_noise_btn` (the mic/
+  // blow button, src/libretro/input.cpp), which technically fits the
+  // isEscapeHackEnabled() rule (a real, extended-hold function). Left
+  // false anyway: blow-using games are rare in practice, and enabling the
+  // hack means a real long Pause-combo hold could stop registering, which
+  // costs everyday Pause convenience for a corner case not worth it.
   isEscapeHackEnabled() {
     return false;
   }
@@ -370,10 +376,12 @@ export class Emulator extends RetroAppWrapper {
       layout = this.SCREEN_LAYOUT_TOP_BOTTOM;
     }
 
-    const microphone = props.microphone;
-    if (microphone) {
-      this.getPrefs().setMicrophoneSupported(true);
-    }
+    // Legacy saved feeds may still have a real boolean here (before this was
+    // a 0/1/2 blow-type selector) -- true !== 1, so normalize explicitly.
+    let microphone = props.microphone;
+    if (microphone === true) microphone = 1;
+    else if (microphone === false || microphone === undefined) microphone = 0;
+    this.getPrefs().setBlowType(microphone);
 
     const dualAnalog = props.dualAnalog;
     if (dualAnalog) {
@@ -458,6 +466,10 @@ export class Emulator extends RetroAppWrapper {
         window.dispatchEvent(new Event("resize"));
       }
     }, 50);
+  }
+
+  getBlowType() {
+    return this.getPrefs().getBlowType();
   }
 
   getScreenLayout() {
